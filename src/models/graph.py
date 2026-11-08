@@ -22,15 +22,10 @@ class Graph:
             self.adjacency[connection.zone_b] = []
 
         if connection.zone_b not in self.adjacency[connection.zone_a]:
-            self.adjacency[self.connection.zone_a].append(
-                connection.zone_b
-            )
+            self.adjacency[connection.zone_a].append(connection.zone_b)
 
         if connection.zone_a not in self.adjacency[connection.zone_b]:
-            self.adjacency[self.connection.zone_b].append(
-                connection.zone_a
-            )
-
+            self.adjacency[connection.zone_b].append(connection.zone_a)
 
     def get_neighbors(self, zone_name: str) -> list[str]:
         return self.adjacency.get(zone_name, [])
