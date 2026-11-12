@@ -5,7 +5,7 @@ MAP ?= test_map.txt
 .PHONY: install run debug lint clean
 
 install:
-	$(PIP) install -r requirements.txt
+	$(PIP) install matplotlib
 
 run:
 	$(PYTHON) main.py $(MAP)

@@ -1,5 +1,6 @@
 import sys
 
+from src.display.renderer import Renderer
 from src.parser.map_parser import parse_file
 from src.simulation.simulator import Simulation
 
@@ -11,8 +12,12 @@ def main() -> None:
 
     try:
         graph = parse_file(sys.argv[1])
+
+        renderer = Renderer(graph)
+        renderer.draw_map()
+
         simulation = Simulation(graph)
-        simulation.run()
+        simulation.run(renderer)
     except (ValueError, RuntimeError, OSError) as error:
         print(f"Error: {error}")
 

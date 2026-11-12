@@ -1,8 +1,38 @@
-nb_drones: 2
-start_hub: start 0 0 [color=green]
-hub: waypoint1 1 0 [color=blue]
-hub: waypoint2 2 0 [color=blue]
-end_hub: goal 3 0 [color=red]
-connection: start-waypoint1
-connection: waypoint1-waypoint2
-connection: waypoint2-goal
+nb_drones: 12
+
+start_hub: start 0 2
+
+hub: north1 1 4
+hub: north2 3 4
+hub: north3 5 4
+
+hub: center1 1 2
+hub: center2 3 2
+hub: center3 5 2
+
+hub: south1 1 0
+hub: south2 3 0
+hub: south3 5 0
+
+hub: blocked1 3 6 [zone=blocked]
+
+end_hub: end 7 2 [color=red]
+
+connection: start-north1 [max_link_capacity=3]
+connection: north1-north2 [max_link_capacity=2]
+connection: north2-north3 [max_link_capacity=2]
+connection: north3-end [max_link_capacity=3]
+
+connection: start-center1 [max_link_capacity=3]
+connection: center1-center2 [max_link_capacity=3]
+connection: center2-center3 [max_link_capacity=3]
+connection: center3-end [max_link_capacity=3]
+
+connection: start-south1 [max_link_capacity=3]
+connection: south1-south2 [max_link_capacity=2]
+connection: south2-south3 [max_link_capacity=2]
+connection: south3-end [max_link_capacity=3]
+
+connection: north1-center2
+connection: center2-south3
+connection: north2-blocked1

@@ -1,6 +1,7 @@
-from src.models.zone import Zone, ZoneType
 from src.models.graph import Graph
 from src.models.drone import Drone
+from src.display.renderer import Renderer
+from src.models.zone import Zone, ZoneType
 from src.models.connection import Connection
 from src.pathfinding.pathfinder import find_path
 
@@ -131,6 +132,7 @@ class Simulation:
         zone = self.get_zone(zone_name)
 
         if zone is None:
+
             return 0
 
         if zone.zone_type in ("start_hub", "end_hub"):
@@ -317,9 +319,12 @@ class Simulation:
             elif action == "move" or action == "arrive":
                 print(f"D{drone.id}-{destination}")
 
-    def run(self) -> None:
+    def run(self, renderer: Renderer | None = None) -> None:
         _, end_zone = self.get_start_end()
         self.drones = self.initialize_drones()
+
+        if renderer is not None:
+            renderer.draw_map(self.drones, self.turn)
 
         while self.drones:
             self.turn += 1
@@ -333,6 +338,8 @@ class Simulation:
             self.apply_moves(moves)
             self.print_turn(self.turn, moves)
 
+            if renderer is not None:
+                renderer.draw_map(self.drones, self.turn)
             delivered = self.get_delivered_drones(end_zone)
 
             for drone in delivered:
