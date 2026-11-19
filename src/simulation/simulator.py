@@ -30,20 +30,36 @@ class Simulation:
     def initialize_drones(self) -> list[Drone]:
         start, end = self.get_start_end()
 
-        path = find_path(self.graph, start, end)
-
-        if not path:
-            raise ValueError("No available path from start to end")
-
-        drones = []
+        edge_loads: dict[tuple[str, str], int] = {}
+        zone_loads: dict[str, int] = {}
+        drones: list[Drone] = []
 
         for drone_id in range(1, self.graph.nb_drones + 1):
+            path = find_path(
+                self.graph,
+                start,
+                end,
+                edge_loads=edge_loads,
+                zone_loads=zone_loads
+            )
+
+            if not path:
+                raise ValueError("No available path from start to end")
+
             drone = Drone(
                 drone_id,
                 start,
                 path.copy()
             )
             drones.append(drone)
+
+            for idx in range(len(path) - 1):
+                z_a = path[idx]
+                z_b = path[idx + 1]
+                key = self.get_connection_key(z_a, z_b)
+                edge_loads[key] = edge_loads.get(key, 0) + 1
+                if z_b != end:
+                    zone_loads[z_b] = zone_loads.get(z_b, 0) + 1
 
         return drones
 
@@ -140,6 +156,18 @@ class Simulation:
 
         return zone.capacity
 
+    def count_incoming_transit(self, zone_name: str) -> int:
+        count = 0
+
+        for drone in self.drones:
+            if (
+                drone.in_transit
+                and drone.transit_destination == zone_name
+            ):
+                count += 1
+
+        return count
+
     def can_enter_zone(
         self,
         zone_name: str,
@@ -152,7 +180,7 @@ class Simulation:
             return True
 
         occupancy = self.count_zone_occupancy(zone_name)
-
+        occupancy += self.count_incoming_transit(zone_name)
         occupancy -= planned_departures.get(zone_name, 0)
         occupancy += planned_arrivals.get(zone_name, 0)
 
@@ -176,14 +204,13 @@ class Simulation:
             zone_a,
             zone_b
         )
-
         occupancy -= planned_exits.get(key, 0)
         occupancy += planned_entries.get(key, 0)
 
         return occupancy < connection.capacity
 
     def plan_moves(self) -> list[tuple[Drone, str, str]]:
-        moves = []
+        moves: list[tuple[Drone, str, str]] = []
 
         planned_departures: dict[str, int] = {}
         planned_arrivals: dict[str, int] = {}
@@ -248,11 +275,9 @@ class Simulation:
             planned_departures[drone.current_zone] = (
                 planned_departures.get(drone.current_zone, 0) + 1
             )
-
             planned_arrivals[next_zone] = (
                 planned_arrivals.get(next_zone, 0) + 1
             )
-
             planned_entries[key] = planned_entries.get(key, 0) + 1
 
             moves.append((drone, next_zone, action))
@@ -303,21 +328,24 @@ class Simulation:
 
     def print_turn(
         self,
-        turn: int,
         moves: list[tuple[Drone, str, str]]
     ) -> None:
-        print(f"Turn {turn}:")
+        tokens: list[str] = []
 
-        for drone, destination, action in moves:
+        for drone, destination, action in sorted(
+            moves, key=lambda item: item[0].id
+        ):
             if action == "transit":
                 connection = drone.transit_connection
                 if connection is not None:
-                    print(
+                    tokens.append(
                         f"D{drone.id}-{connection[0]}-{connection[1]}"
                     )
+            elif action in ("move", "arrive"):
+                tokens.append(f"D{drone.id}-{destination}")
 
-            elif action == "move" or action == "arrive":
-                print(f"D{drone.id}-{destination}")
+        if tokens:
+            print(" ".join(tokens))
 
     def run(self, renderer: Renderer | None = None) -> None:
         _, end_zone = self.get_start_end()
@@ -336,7 +364,7 @@ class Simulation:
                 )
 
             self.apply_moves(moves)
-            self.print_turn(self.turn, moves)
+            self.print_turn(moves)
 
             if renderer is not None:
                 renderer.draw_map(self.drones, self.turn)

@@ -1,7 +1,8 @@
 import heapq
 
+from src.models.connection import Connection
 from src.models.graph import Graph
-from src.models.zone import ZoneType
+from src.models.zone import Zone, ZoneType
 
 
 def is_better(
@@ -17,10 +18,52 @@ def is_better(
     return False
 
 
+def _get_connection(
+    graph: Graph,
+    zone_a: str,
+    zone_b: str
+) -> Connection | None:
+    for connection in graph.connections:
+        if (
+            (connection.zone_a == zone_a and connection.zone_b == zone_b)
+            or (connection.zone_a == zone_b and connection.zone_b == zone_a)
+        ):
+            return connection
+    return None
+
+
+def _step_cost(
+    graph: Graph,
+    current_zone: str,
+    neighbor: Zone,
+    edge_loads: dict[tuple[str, str], int] | None = None,
+    zone_loads: dict[str, int] | None = None
+) -> float:
+    base_cost = 2.0 if neighbor.zone_type_enum == ZoneType.RESTRICTED else 1.0
+    penalty = 0.0
+
+    if neighbor.zone_type not in ("start_hub", "end_hub"):
+        zone_cap = max(1, neighbor.capacity)
+        z_load = zone_loads.get(neighbor.name, 0) if zone_loads else 0
+        penalty += (z_load / zone_cap) * 1.5
+
+    conn = _get_connection(graph, current_zone, neighbor.name)
+    if conn is not None:
+        conn_cap = max(1, conn.capacity)
+        key = (min(current_zone, neighbor.name),
+               max(current_zone, neighbor.name))
+        e_load = edge_loads.get(key, 0) if edge_loads else 0
+        penalty += (e_load / conn_cap) * 1.5
+
+    return base_cost + penalty
+
+
 def find_path(
     graph: Graph,
     start: str,
-    end: str
+    end: str,
+    edge_loads: dict[tuple[str, str], int] | None = None,
+    zone_loads: dict[str, int] | None = None
 ) -> list[str]:
     zones_by_name = {
         zone.name: zone
@@ -30,19 +73,18 @@ def find_path(
     if start not in zones_by_name or end not in zones_by_name:
         return []
 
-    distances = {
+    distances: dict[str, tuple[float, int]] = {
         zone.name: (float("inf"), 0)
         for zone in graph.zones
     }
-
-    distances[start] = (0, 0)
+    distances[start] = (0.0, 0)
 
     previous: dict[str, str | None] = {
         zone.name: None
         for zone in graph.zones
     }
 
-    priority_queue = [(0, 0, start)]
+    priority_queue: list[tuple[float, int, str]] = [(0.0, 0, start)]
 
     while priority_queue:
         popped_cost, negative_priority, current_zone = (
@@ -63,9 +105,13 @@ def find_path(
             if neighbor.zone_type_enum == ZoneType.BLOCKED:
                 continue
 
-            movement_cost = 2 if (
-                neighbor.zone_type_enum == ZoneType.RESTRICTED
-            ) else 1
+            movement_cost = _step_cost(
+                graph,
+                current_zone,
+                neighbor,
+                edge_loads=edge_loads,
+                zone_loads=zone_loads
+            )
 
             priority_bonus = 1 if (
                 neighbor.zone_type_enum == ZoneType.PRIORITY
@@ -92,7 +138,7 @@ def find_path(
     if distances[end][0] == float("inf"):
         return []
 
-    path = []
+    path: list[str] = []
     current: str | None = end
 
     while current is not None:

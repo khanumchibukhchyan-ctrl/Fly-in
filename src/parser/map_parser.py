@@ -76,7 +76,6 @@ def parse_main(
         zone_type = "start_hub"
     elif zone_components[0] == "end_hub:":
         zone_type = "end_hub"
-
     else:
         raise ValueError(
             f"Line {line_number}: "
@@ -116,6 +115,7 @@ def parse_zone_metadata(
         )
 
     seen_keys = set()
+    max_drones_specified = False
 
     for part in parts:
         if "=" not in part:
@@ -136,6 +136,7 @@ def parse_zone_metadata(
                 f"Duplicate metadata key: {key}"
             )
         seen_keys.add(key)
+
         if key == "zone":
             try:
                 zone.zone_type_enum = ZoneType(value)
@@ -145,6 +146,12 @@ def parse_zone_metadata(
                     f"Invalid zone type: {value}"
                 )
         elif key == "max_drones":
+            max_drones_specified = True
+            if zone.zone_type_enum == ZoneType.BLOCKED:
+                raise ValueError(
+                    f"Line {line_number}: "
+                    "max_drones is not allowed for blocked zone"
+                )
             if zone.zone_type in ("start_hub", "end_hub"):
                 continue
             try:
@@ -167,6 +174,13 @@ def parse_zone_metadata(
                 f"Line {line_number}: "
                 f"Unknown metadata: {key}"
             )
+
+    if zone.zone_type_enum == ZoneType.BLOCKED and max_drones_specified:
+        raise ValueError(
+            f"Line {line_number}: "
+            "max_drones is not allowed for blocked zone"
+        )
+
     return zone
 
 
@@ -311,6 +325,13 @@ def parse_line(line: str, graph: Graph, line_number: int) -> None:
                     f"Duplicate zone name: {zone.name}"
                 )
 
+        for existing_zone in graph.zones:
+            if existing_zone.x == zone.x and existing_zone.y == zone.y:
+                raise ValueError(
+                    f"Line {line_number}: "
+                    f"Duplicate zone coordinates: ({zone.x}, {zone.y})"
+                )
+
         graph.add_zone(zone)
     else:
         raise ValueError(f"Line {line_number}: Unknown line: {line}")
@@ -322,23 +343,28 @@ def parse_file(filename: str) -> Graph:
     end_flag = False
 
     with open(filename) as file:
-        first_line = file.readline().strip()
+        first_line = ""
+        first_line_number = 0
+        for line_number, raw_line in enumerate(file, start=1):
+            stripped = raw_line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            first_line = stripped
+            first_line_number = line_number
+            break
+
+        if not first_line:
+            raise ValueError("Empty map file: missing nb_drones")
 
         if not first_line.startswith("nb_drones:"):
-            raise ValueError("Line 1: First line must define nb_drones")
+            raise ValueError(
+                f"Line {first_line_number}: "
+                "First non-empty line must define nb_drones"
+            )
 
-        parts = first_line.split(":", 1)
+        parse_line(first_line, graph, first_line_number)
 
-        if (
-            len(parts) != 2
-            or parts[0].strip() != "nb_drones"
-            or not parts[1].strip()
-        ):
-            raise ValueError("Line 1: Invalid nb_drones format")
-
-        parse_line(first_line, graph, 1)
-
-        for line_number, line in enumerate(file, start=2):
+        for line_number, line in enumerate(file, start=first_line_number + 1):
             line = line.strip()
 
             if not line or line.startswith("#"):
@@ -367,9 +393,11 @@ def parse_file(filename: str) -> Graph:
                 end_flag = True
 
             parse_line(line, graph, line_number)
+
         if not start_flag:
             raise ValueError("Line 1: Missing start hub.")
 
         if not end_flag:
             raise ValueError("Line 1: Missing end hub.")
+
     return graph
