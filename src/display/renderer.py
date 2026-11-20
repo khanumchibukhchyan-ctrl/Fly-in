@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 
+from matplotlib.patches import Wedge
 from src.models.connection import Connection
 from src.models.drone import Drone
 from src.models.graph import Graph
@@ -15,6 +16,42 @@ class Renderer:
             self.fig.canvas.manager.set_window_title("Fly-in Simulation")
         plt.ion()
 
+    def _draw_rainbow_zone(self, zone: Zone) -> None:
+        colors = [
+            "red",
+            "orange",
+            "yellow",
+            "green",
+            "blue",
+            "indigo",
+            "violet",
+        ]
+
+        radius = 0.38
+
+        for i, color in enumerate(colors):
+            wedge = Wedge(
+                (zone.x, zone.y),
+                radius,
+                i * 360 / len(colors),
+                (i + 1) * 360 / len(colors),
+                facecolor=color,
+                edgecolor="black",
+                linewidth=1,
+                zorder=3,
+            )
+            self.ax.add_patch(wedge)
+
+        border = plt.Circle(
+            (zone.x, zone.y),
+            radius,
+            fill=False,
+            edgecolor="black",
+            linewidth=2.5,
+            zorder=4,
+        )
+        self.ax.add_patch(border)
+
     def _resolve_zone_color(self, zone: Zone) -> str:
         type_colors: dict[ZoneType, str] = {
             ZoneType.NORMAL: "#FFF2B2",
@@ -22,10 +59,13 @@ class Renderer:
             ZoneType.RESTRICTED: "#FFD6A5",
             ZoneType.PRIORITY: "gold",
         }
+        if zone.color == "rainbow":
+            return "rainbow"
         if zone.zone_type == "start_hub":
             return "#A8E6CF"
         if zone.zone_type == "end_hub":
             return "#FFB7C5"
+
         if zone.color and zone.color != "none":
             return zone.color
         return type_colors.get(zone.zone_type_enum, "gray")
@@ -78,20 +118,28 @@ class Renderer:
         for zone in self.graph.zones:
             fill_color = self._resolve_zone_color(zone)
             edge_color = (
-                zone.color
-                if zone.color and zone.color != "none"
-                else "black"
+                "black"
+                if zone.color == "rainbow"
+                else (
+                    zone.color
+                    if zone.color and zone.color != "none"
+                    else "black"
+                )
             )
 
-            self.ax.scatter(
-                zone.x,
-                zone.y,
-                color=fill_color,
-                s=900,
-                edgecolors=edge_color,
-                linewidths=2.5,
-                zorder=2,
-            )
+            if fill_color == "rainbow":
+                self._draw_rainbow_zone(zone)
+            else:
+                self.ax.scatter(
+                    zone.x,
+                    zone.y,
+                    color=fill_color,
+                    s=900,
+                    edgecolors=edge_color,
+                    linewidths=2.5,
+                    zorder=2,
+                )
+
             self.ax.text(
                 zone.x,
                 zone.y - 0.35,
@@ -124,6 +172,7 @@ class Renderer:
                 if drone.in_transit:
                     if drone.transit_connection is None:
                         continue
+
                     zone_a, zone_b = drone.transit_connection
                     x1, y1 = positions[zone_a]
                     x2, y2 = positions[zone_b]
@@ -135,35 +184,44 @@ class Renderer:
                 drone_positions.setdefault(base_pos, []).append(drone)
 
             for (bx, by), group in drone_positions.items():
-                for index, drone in enumerate(group):
-                    offset = (index - (len(group) - 1) / 2) * 0.5
-                    drone_x = bx + offset
-                    drone_y = by + 0.45
+                count = len(group)
 
-                    all_x.append(drone_x)
-                    all_y.append(drone_y)
+                drone_x = bx
+                drone_y = by + 0.25
 
-                    self.ax.scatter(
-                        drone_x,
-                        drone_y,
-                        color="#BFDFFF",
-                        marker="o",
-                        s=1100,
-                        edgecolors="black",
-                        linewidths=2.5,
-                        zorder=5,
-                    )
-                    self.ax.text(
-                        drone_x,
-                        drone_y,
-                        f"D{drone.id}",
-                        ha="center",
-                        va="center",
-                        fontsize=12,
-                        fontweight="bold",
-                        color="black",
-                        zorder=6,
-                    )
+                all_x.append(drone_x)
+                all_y.append(drone_y)
+
+                label = (
+                    f"D{group[0].id}"
+                    if count == 1
+                    else str(count)
+                )
+
+                font_size = 12 if count < 10 else 10
+
+                self.ax.scatter(
+                    drone_x,
+                    drone_y,
+                    color="#BFDFFF",
+                    marker="o",
+                    s=1100,
+                    edgecolors="black",
+                    linewidths=2.5,
+                    zorder=5,
+                )
+
+                self.ax.text(
+                    drone_x,
+                    drone_y,
+                    label,
+                    ha="center",
+                    va="center",
+                    fontsize=font_size,
+                    fontweight="bold",
+                    color="black",
+                    zorder=6,
+                )
 
         if all_x and all_y:
             padding = 1.5

@@ -145,15 +145,22 @@ def parse_zone_metadata(
                     f"Line {line_number}: "
                     f"Invalid zone type: {value}"
                 )
+
         elif key == "max_drones":
             max_drones_specified = True
+
+            if zone.zone_type in ("start_hub", "end_hub"):
+                raise ValueError(
+                    f"Line {line_number}: "
+                    "max_drones is not allowed for start_hub or end_hub"
+                )
+
             if zone.zone_type_enum == ZoneType.BLOCKED:
                 raise ValueError(
                     f"Line {line_number}: "
                     "max_drones is not allowed for blocked zone"
                 )
-            if zone.zone_type in ("start_hub", "end_hub"):
-                continue
+
             try:
                 capacity = int(value)
             except ValueError:
@@ -161,12 +168,16 @@ def parse_zone_metadata(
                     f"Line {line_number}: "
                     f"Invalid max_drones value: {value}"
                 )
+
             if capacity <= 0:
                 raise ValueError(
                     f"Line {line_number}: "
                     f"Invalid max_drones value: {value}"
                 )
+
             zone.capacity = capacity
+
+
         elif key == "color":
             zone.color = value
         else:

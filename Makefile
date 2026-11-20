@@ -1,6 +1,6 @@
 PYTHON = python3
 PIP = $(PYTHON) -m pip
-MAP ?= test_map.txt
+MAP ?= maps/easy/01_linear_path.txt
 TARGETS = main.py src
 
 .PHONY: install run debug lint lint-strict clean
