@@ -18,7 +18,7 @@ def is_better(
     return False
 
 
-def _get_connection(
+def get_connection(
     graph: Graph,
     zone_a: str,
     zone_b: str
@@ -32,22 +32,28 @@ def _get_connection(
     return None
 
 
-def _step_cost(
+def step_cost(
     graph: Graph,
     current_zone: str,
     neighbor: Zone,
     edge_loads: dict[tuple[str, str], int] | None = None,
     zone_loads: dict[str, int] | None = None
 ) -> float:
-    base_cost = 2.0 if neighbor.zone_type_enum == ZoneType.RESTRICTED else 1.0
+    if (neighbor.zone_type_enum == ZoneType.RESTRICTED):
+        base_cost = 2.0    
+    else:
+        base_cost = 1.0
     penalty = 0.0
 
     if neighbor.zone_type not in ("start_hub", "end_hub"):
         zone_cap = max(1, neighbor.capacity)
-        z_load = zone_loads.get(neighbor.name, 0) if zone_loads else 0
+        if zone_loads:
+            z_load = zone_loads.get(neighbor.name, 0)
+        else:
+            z_load = 0
         penalty += (z_load / zone_cap) * 1.5
 
-    conn = _get_connection(graph, current_zone, neighbor.name)
+    conn = get_connection(graph, current_zone, neighbor.name)
     if conn is not None:
         conn_cap = max(1, conn.capacity)
         key = (min(current_zone, neighbor.name),
@@ -105,7 +111,7 @@ def find_path(
             if neighbor.zone_type_enum == ZoneType.BLOCKED:
                 continue
 
-            movement_cost = _step_cost(
+            movement_cost = step_cost(
                 graph,
                 current_zone,
                 neighbor,
