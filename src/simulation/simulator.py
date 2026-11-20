@@ -180,7 +180,6 @@ class Simulation:
             return True
 
         occupancy = self.count_zone_occupancy(zone_name)
-        occupancy += self.count_incoming_transit(zone_name)
         occupancy -= planned_departures.get(zone_name, 0)
         occupancy += planned_arrivals.get(zone_name, 0)
 
